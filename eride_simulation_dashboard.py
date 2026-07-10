@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from pathlib import Path
 
 import altair as alt
 import numpy as np
@@ -263,6 +264,16 @@ with sc2:
         st.session_state["rpd_m"] = 10.0
         st.session_state["days_m"] = 26.0
         st.session_state["completion_m"] = 90.0
+
+excel_model_path = Path(__file__).with_name("eride_operating_model.xlsx")
+if excel_model_path.exists():
+    st.download_button(
+        "Download Excel fallback model",
+        data=excel_model_path.read_bytes(),
+        file_name="eride_operating_model.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        help="Use this spreadsheet if the dashboard is unavailable or if the client wants to inspect formulas.",
+    )
 
 
 # ---------------------------------------------------------------------------
