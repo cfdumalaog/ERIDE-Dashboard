@@ -245,9 +245,9 @@ with q2:
     )
 with q3:
     include_cloud_cost = st.checkbox(
-        "Recover AWS/cloud/API cost",
+        "Recover cloud/API cost",
         value=True,
-        help="Includes POC/cloud/API cost growth from the workbook-based model.",
+        help="Includes POC baseline plus Google Maps/Places/Routes API usage growth. Full AWS production architecture should be priced separately.",
         key="include_cloud_cost",
     )
 
@@ -336,29 +336,41 @@ def fare_from_inputs(distance_km, minutes, base, included_km_, per_km_, long_thr
 
 
 def cloud_cost_from_workbook(active_users):
-    """Workbook-based cloud/API scaling.
+    """Cloud/API scaling based on workbook usage and official Google tier prices.
 
-    The E-Ride Dev Costing Foundation workbook pilot sheet uses:
+    The E-Ride Dev Costing Foundation workbook pilot sheet supplies:
     - PHP 58/USD
-    - 21 pilot days
-    - 10,000 free monthly events per priced API
     - per-user/day API events inferred from 20-user pilot quantities:
       5 autocomplete, 2 place-detail, 1 geocoding, 2 routes
-    - post-free-tier prices of USD 2.83/1k, USD 5/1k, USD 5/1k, USD 5/1k
+
+    Pricing uses Google Maps Platform's published tier ladder:
+    - Autocomplete Requests: 10k free, then 2.83 / 2.27 / 1.70 / 0.85 / 0.21 USD per 1k
+    - Place Details Essentials, Geocoding, Compute Routes Essentials:
+      10k free, then 5.00 / 4.00 / 3.00 / 1.50 / 0.38 USD per 1k
 
     The developer-confirmed POC baseline is PHP 1,500 because current POC usage
     is expected to sit inside free tiers except for a small hosted-fallback budget.
     """
     users_ = np.asarray(active_users, dtype=float)
     baseline_php = float(st.session_state.get("poc_cloud", 1500.0))
-    pilot_days = 21.0
+    billing_days = float(st.session_state.get("days_m", 26.0))
     php_per_usd = 58.0
-    free_events = 10_000.0
-    usage_per_user_day = np.array([5.0, 2.0, 1.0, 2.0])
-    usd_per_1000 = np.array([2.83, 5.0, 5.0, 5.0])
-    events = np.expand_dims(users_, axis=-1) * pilot_days * usage_per_user_day
-    overage = np.maximum(events - free_events, 0.0)
-    variable_php = np.sum(overage / 1000.0 * usd_per_1000, axis=-1) * php_per_usd
+    usage_per_user_day = np.array([5.0, 2.0, 1.0, 2.0], dtype=float)
+    rates = np.array([
+        [0.0, 2.83, 2.27, 1.70, 0.85, 0.21],
+        [0.0, 5.00, 4.00, 3.00, 1.50, 0.38],
+        [0.0, 5.00, 4.00, 3.00, 1.50, 0.38],
+        [0.0, 5.00, 4.00, 3.00, 1.50, 0.38],
+    ])
+    bounds = np.array([0, 10_000, 100_000, 500_000, 1_000_000, 5_000_000, np.inf], dtype=float)
+    events = np.expand_dims(users_, axis=-1) * billing_days * usage_per_user_day
+    variable_usd = np.zeros_like(users_, dtype=float)
+    for api_index in range(events.shape[-1]):
+        api_events = events[..., api_index]
+        for tier_index, rate in enumerate(rates[api_index]):
+            billable = np.maximum(np.minimum(api_events, bounds[tier_index + 1]) - bounds[tier_index], 0.0)
+            variable_usd += billable / 1000.0 * rate
+    variable_php = variable_usd * php_per_usd
     return baseline_php + variable_php
 
 
@@ -852,10 +864,11 @@ with tabs[1]:
 
 
 with tabs[2]:
-    st.markdown("### AWS / cloud cost tiers")
+    st.markdown("### Cloud/API cost tiers")
     st.write(
         "The current POC is expected to cost around PHP 1,500 because implemented features sit mostly inside free tiers. "
-        "As users grow, map/search/route API calls are the main cost driver in the workbook-based model."
+        "As users grow, Google Maps/Places/Routes API calls are the main modeled cost driver. "
+        "AWS infrastructure is still represented only by the POC baseline unless a production server/database architecture is priced separately."
     )
     tier_users = np.array([20, 100, 500, 1_000, 3_750, 5_000, 10_000, 25_000])
     tier_names = [
@@ -915,7 +928,11 @@ with tabs[2]:
     )
     st.altair_chart(cloud_chart, width="stretch")
     st.caption(
-        "Workbook basis: PHP 58/USD, 21 days, 10,000 free monthly events per priced API, and pilot usage ratios of 5 autocomplete, 2 place-detail, 1 geocoding and 2 route events per user/day. AWS account/budget/S3/SES/CloudWatch items remain low or optional at POC scale; map/search/route API usage is the growth driver."
+        f"Basis: PHP 58/USD, {days.mean:g} operating days/month, workbook pilot usage ratios of 5 autocomplete, 2 place-detail, "
+        "1 geocoding and 2 route events per user/day, and official Google Maps Platform tiered pricing. "
+        "Autocomplete Requests use 10k free then 2.83/2.27/1.70/0.85/0.21 USD per 1k by volume; "
+        "Place Details Essentials, Geocoding, and Compute Routes Essentials use 10k free then 5/4/3/1.5/0.38 USD per 1k. "
+        "This is a Google API usage model plus a POC baseline, not a full AWS production architecture estimate."
     )
 
 
