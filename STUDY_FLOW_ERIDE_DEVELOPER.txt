@@ -6,12 +6,275 @@ Main project stack to prepare for:
 - Python + Streamlit for the business dashboard
 - Excel formulas / financial modeling for backup costing sheets
 - Git + GitHub for version control and deployment
-- React Native for passenger and rider mobile apps
+- Kotlin + Android Studio for passenger and rider mobile apps
 - React + TypeScript for future admin/operator dashboard
 - Node.js / Express or NestJS for backend APIs
 - PostgreSQL or similar database for trips, users, riders, fleet, and payments
 - Google Maps Platform APIs for maps, places, geocoding, and routing
 - AWS basics for backend deployment, monitoring, storage, and cost control
+
+
+TOOLS AND SETUP
+Target: 1 to 2 days
+
+Install these first:
+1. Git
+   - Use this for version control.
+   - Learn: git status, git diff, git add, git commit, git push.
+
+2. GitHub CLI
+   - Useful for logging in and pushing work.
+   - Command to check:
+     gh auth status
+
+3. Python 3.11 or newer
+   - Used for Streamlit dashboard and Excel workbook automation.
+   - Command to check:
+     python --version
+
+4. VS Code or Cursor
+   - Use this for Python, markdown, docs, and backend work.
+   - Recommended extensions:
+     - Python
+     - Pylance
+     - GitLens
+     - Markdown All in One
+     - Excel Viewer
+     - REST Client or Thunder Client
+
+5. Android Studio
+   - Main tool for Kotlin Android app development.
+   - Install:
+     - Android SDK
+     - Android Emulator
+     - Kotlin plugin, usually bundled
+     - Gradle support, bundled
+
+6. Java Development Kit
+   - Android Studio usually bundles a JDK.
+   - If needed, use JDK 17.
+
+7. Node.js LTS
+   - Needed for backend or admin dashboard development.
+   - Command to check:
+     node --version
+     npm --version
+
+8. Database tool
+   - Recommended: DBeaver or TablePlus.
+   - Use this later for PostgreSQL.
+
+9. API testing tool
+   - Recommended: Postman, Bruno, Insomnia, or VS Code REST Client.
+
+10. Excel or LibreOffice
+   - Needed to inspect eride_operating_model.xlsx.
+
+11. Optional but useful:
+   - Docker Desktop
+   - pgAdmin
+   - Figma
+   - Notion or Obsidian for notes
+
+
+LOCAL PROJECT SETUP
+Target: 1 day
+
+1. Clone or open the repository.
+
+2. Create a Python virtual environment:
+   python -m venv .venv
+
+3. Activate it on Windows PowerShell:
+   .venv\Scripts\Activate.ps1
+
+4. Install dependencies:
+   pip install -r requirements.txt
+
+5. Run the dashboard:
+   python -m streamlit run eride_simulation_dashboard.py
+
+6. Check the Excel fallback model:
+   Open eride_operating_model.xlsx
+
+7. Before editing, always check:
+   git status -sb
+
+8. After editing, validate:
+   python -m py_compile eride_simulation_dashboard.py
+
+9. If Streamlit changed:
+   run the dashboard locally and click through the tabs.
+
+
+ANDROID / KOTLIN SETUP
+Target: 2 to 3 days
+
+Install and configure:
+1. Android Studio
+2. Android SDK Platform
+3. Android SDK Build-Tools
+4. Android Emulator
+5. Kotlin support
+6. Google Play Services / Maps dependencies when needed
+
+Recommended Android skills:
+1. Kotlin basics
+2. Android Activity and Fragment basics
+3. Jetpack Compose if the app uses Compose
+4. XML layouts if the app uses traditional Android views
+5. ViewModel
+6. StateFlow / LiveData
+7. Retrofit for API calls
+8. OkHttp for networking
+9. Room or local storage basics
+10. Google Maps SDK for Android
+11. Location permissions
+12. Foreground location behavior
+13. Push notifications concept
+
+Kotlin learning order:
+1. Variables and types
+2. Functions
+3. Classes and data classes
+4. Null safety
+5. Collections
+6. Coroutines
+7. Flow
+8. Sealed classes
+9. Error handling
+10. Basic unit tests
+
+Android mini setup task:
+- Create a blank Kotlin Android project.
+- Run it on emulator.
+- Add one screen with:
+  - title
+  - button
+  - text state that changes when clicked
+
+E-Ride Android mini task:
+- Create static screens for:
+  - passenger home
+  - pickup/dropoff search
+  - ride request confirmation
+  - rider incoming request
+  - rider earnings summary
+
+
+AI TOOL SETUP AND SAFE USE
+Target: 1 day
+
+Recommended AI tools:
+1. Codex / ChatGPT
+   - Use for code explanation, debugging, refactoring, test writing, and documentation.
+
+2. GitHub Copilot or Cursor
+   - Use for autocomplete and small code generation.
+
+3. Perplexity or web search
+   - Use for current pricing, SDK docs, and API changes.
+
+Rules for using AI safely:
+1. Never paste secrets:
+   - API keys
+   - database passwords
+   - production credentials
+   - private tokens
+
+2. Ask AI to explain before editing when you are learning.
+
+3. Use AI for:
+   - understanding code
+   - generating first drafts
+   - writing tests
+   - finding bugs
+   - summarizing docs
+   - comparing implementation options
+
+4. Do not blindly accept AI output.
+   Always run the app, test the change, and inspect the diff.
+
+5. Ask AI for small patches.
+   Better:
+   "Add a new charging station rent input to the Streamlit dashboard."
+   Worse:
+   "Rewrite the whole project."
+
+6. Keep an AI work log:
+   - prompt used
+   - file changed
+   - reason for change
+   - test result
+
+7. For pricing, laws, SDK docs, and cloud costs:
+   ask AI to verify against official sources.
+
+Useful AI prompts:
+1. "Explain this function line by line like I am new to Python."
+2. "Trace how this dashboard input affects monthly profit."
+3. "Find possible bugs in this fare calculation."
+4. "Create a Kotlin data class for an E-Ride trip."
+5. "Write Retrofit API interfaces for these endpoints."
+6. "Review this git diff and tell me what changed."
+7. "Create unit tests for this fare calculation."
+8. "Convert this business formula into Excel and Python."
+9. "Explain this Android error and suggest a fix."
+10. "Create a checklist before pushing this change."
+
+
+WHICH TOOL TO USE FOR EACH TASK
+
+Dashboard change:
+- Tool: VS Code or Cursor
+- Files: eride_simulation_dashboard.py, eride_operating_model.xlsx
+- Commands:
+  python -m py_compile eride_simulation_dashboard.py
+  python -m streamlit run eride_simulation_dashboard.py
+
+Excel/modeling change:
+- Tool: Excel or LibreOffice
+- Files: eride_operating_model.xlsx
+- Also check: matching formulas in eride_simulation_dashboard.py
+
+Mobile app change:
+- Tool: Android Studio
+- Language: Kotlin
+- Use:
+  - Emulator for testing
+  - Logcat for errors
+  - Gradle sync when dependencies change
+  - Google Maps SDK docs for maps/location features
+
+Backend/API change:
+- Tool: VS Code or Cursor
+- Language: Node.js / TypeScript or JavaScript
+- Use:
+  - Postman/Bruno/Insomnia for API tests
+  - PostgreSQL tool for database checks
+  - terminal logs for debugging
+
+Cloud/deployment change:
+- Tool: AWS Console, GitHub, terminal
+- Always use:
+  - IAM least privilege
+  - billing alerts
+  - environment variables
+  - logs/monitoring
+
+GitHub change:
+- Tool: terminal or GitHub Desktop
+- Commands:
+  git status -sb
+  git diff
+  git add <file>
+  git commit -m "message"
+  git push origin main
+
+Research/pricing change:
+- Tool: official docs first
+- Use AI only to summarize and compare.
+- Always record the source link and date checked.
 
 
 PHASE 1 - PROJECT ORIENTATION
@@ -317,20 +580,23 @@ Checkpoint:
 - You can explain what data is needed to calculate revenue, wage coverage, and utilization.
 
 
-PHASE 10 - REACT NATIVE MOBILE APP BASICS
+PHASE 10 - KOTLIN ANDROID MOBILE APP BASICS
 Target: 2 to 3 weeks
 
 Learn:
-1. React components
-2. props and state
-3. hooks
-4. navigation
-5. forms
-6. API calls
-7. maps
-8. location permissions
-9. push notifications concept
-10. mobile UI patterns
+1. Kotlin basics
+2. Android Studio project structure
+3. Gradle basics
+4. Activities and app lifecycle
+5. Jetpack Compose or XML layouts, depending on the existing app
+6. ViewModel and UI state
+7. Coroutines and Flow
+8. Retrofit API calls
+9. Google Maps SDK for Android
+10. location permissions
+11. foreground/background location rules
+12. push notifications concept
+13. mobile UI patterns
 
 Passenger app screens:
 - login/signup
@@ -362,6 +628,7 @@ Mini task:
 
 Checkpoint:
 - You can explain the passenger and rider ride flow end to end.
+- You can build or modify one Kotlin screen without breaking the app.
 
 
 PHASE 11 - ADMIN / OPERATOR DASHBOARD
@@ -542,8 +809,8 @@ Week 6:
 - Connect API to database
 
 Week 7:
-- React Native basics
-- Build static passenger/rider screens
+- Kotlin Android basics
+- Build static passenger/rider screens in Android Studio
 
 Week 8:
 - Connect mobile screens to mock API
@@ -588,7 +855,7 @@ You are ready to contribute meaningfully when you can:
 [ ] Use git status, diff, add, commit, push
 [ ] Read a backend API route
 [ ] Design a simple trips table
-[ ] Build a simple React Native screen
+[ ] Build a simple Kotlin Android screen
 [ ] Explain passenger and rider trip flow
 [ ] Keep API keys and secrets out of GitHub
 
@@ -600,7 +867,7 @@ You do not need to know everything before helping.
 Your first developer role in this project should be:
 Dashboard and business-model developer first,
 then backend/API contributor,
-then mobile/admin dashboard contributor,
+then Kotlin Android mobile/admin dashboard contributor,
 then cloud/deployment support.
 
 That path matches the current E-Ride project best because the operating model is already the main decision tool, and it teaches the business logic needed before building the production ride-hailing system.
