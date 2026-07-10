@@ -219,6 +219,31 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+st.markdown("### Quick recovery switches")
+st.caption("Use these to decide which investment costs E-Ride must recover through monthly operations.")
+q1, q2, q3 = st.columns(3)
+with q1:
+    include_fleet_capex = st.checkbox(
+        "Recover fleet assets",
+        value=True,
+        help="Includes motorcycle and backup-battery amortization. Maintenance and insurance remain included either way.",
+        key="include_fleet_capex",
+    )
+with q2:
+    include_dev_recovery = st.checkbox(
+        "Recover development cost",
+        value=True,
+        help="Includes the six-month build recovery and ongoing dev support retainer.",
+        key="include_dev_recovery",
+    )
+with q3:
+    include_cloud_cost = st.checkbox(
+        "Recover AWS/cloud/API cost",
+        value=True,
+        help="Includes POC/cloud/API cost growth from the workbook-based model.",
+        key="include_cloud_cost",
+    )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -243,14 +268,6 @@ def pct(x: float, decimals: int = 1) -> str:
     return f"{100 * x:.{decimals}f}%"
 
 
-def draw(rng: np.random.Generator, d: Dist, n: int) -> np.ndarray:
-    if d.sd <= 0:
-        out = np.full(n, d.mean, dtype=float)
-    else:
-        out = rng.normal(d.mean, d.sd, n)
-    return np.clip(out, d.low, d.high if d.high is not None else np.inf)
-
-
 def ninput(label, value, step=1.0, min_value=0.0, help=None, key=None, decimals=None):
     if decimals is None:
         decimals = 2 if abs(float(step)) < 1 else 0
@@ -265,15 +282,9 @@ def ninput(label, value, step=1.0, min_value=0.0, help=None, key=None, decimals=
     )
 
 
-SIMULATION_SD_CONTROLS: list[dict] = []
-
-
 def mean_sd(label, mean, sd, step=1.0, min_value=0.0, help=None, key=""):
     m = ninput(label, mean, step, min_value, help, f"{key}_m")
-    sd_key = f"simulation_sd_{key}"
-    s = float(st.session_state.get(sd_key, sd))
-    SIMULATION_SD_CONTROLS.append({"label": label, "default": sd, "step": step, "key": sd_key})
-    return Dist(m, s, min_value)
+    return Dist(m, 0.0, min_value)
 
 
 def fare_from_inputs(distance_km, minutes, base, included_km_, per_km_, long_threshold, long_per_km_, included_min, per_min, discount):
@@ -350,12 +361,7 @@ with st.sidebar:
         incentive_rate = ninput("Commission above threshold (%)", 20, 1, 0, key="inc_rate") / 100
 
     with st.expander("Fleet, energy and assets", expanded=True):
-        include_fleet_capex = st.checkbox(
-            "Include fleet acquisition in profit calculation",
-            value=True,
-            help="When off, profit excludes motorcycle and backup-battery amortization but still includes maintenance and insurance.",
-            key="include_fleet_capex",
-        )
+        st.caption("Fleet recovery is controlled by the quick switches above.")
         motorcycle_cost = mean_sd("E-motorcycle cost", 80000, 8000, 5000, 1, "Primary battery assumed included.", "bike")
         backup_battery = mean_sd("Backup battery cost / bike", 20000, 3000, 1000, 0, "One backup battery per motorcycle.", "battery")
         asset_life = ninput("Asset recovery period (months)", 48, 1, 1, key="life")
@@ -365,6 +371,7 @@ with st.sidebar:
         power_rate = mean_sd("Electricity rate / kWh", 13.0, 1.5, 0.5, 1, "Blended charging tariff.", "power")
 
     with st.expander("Development and operations", expanded=True):
+        st.caption("Development and cloud recovery are controlled by the quick switches above.")
         build_cost = mean_sd("Development build budget", 1_000_000, 100_000, 50_000, 0, "Client-facing build budget spread over six months.", "build")
         build_recovery = ninput("Development recovery period (months)", 6, 1, 1, "Use 6 months to match the implementation work plan.", "build_life")
         dev_retainer = mean_sd("Ongoing dev support retainer", 55_000, 10_000, 5_000, 0, "Post-build support and iteration tier.", "dev")
@@ -418,8 +425,8 @@ def deterministic_model(fare: float, completed_override: float | None = None):
         riders_ * (motorcycle_cost.mean + backup_battery.mean) / asset_life if include_fleet_capex else 0
     )
     fleet_ops = riders_ * (maintenance.mean + insurance.mean)
-    development = build_cost.mean / build_recovery + dev_retainer.mean
-    technology = float(cloud_cost_from_workbook(users_))
+    development = build_cost.mean / build_recovery + dev_retainer.mean if include_dev_recovery else 0.0
+    technology = float(cloud_cost_from_workbook(users_)) if include_cloud_cost else 0.0
     operations = ops_fixed.mean + users_ * (support_user.mean + marketing.mean)
     payment = revenue * digital_share * payment_fee
     reserve = revenue * regulatory_reserve
@@ -506,112 +513,6 @@ else:
 scenario = deterministic_model(expected_fare)
 
 
-# Simulation draws
-seed = int(st.session_state.get("simulation_seed", 42))
-simulations = int(st.session_state.get("simulation_trials", 5000))
-rng = np.random.default_rng(seed)
-n = simulations
-
-samples = {
-    "Active users": draw(rng, users, n),
-    "Riders": draw(rng, riders, n),
-    "Rides/user/month": draw(rng, rides_user, n),
-    "Rides/rider/day": draw(rng, rides_rider, n),
-    "Operating days": draw(rng, days, n),
-    "Completion %": draw(rng, completion, n) / 100,
-    "Average km": draw(rng, avg_km, n),
-    "Base fare": draw(rng, base_fare, n),
-    "Charge/km": draw(rng, per_km, n),
-    "Long charge/km": draw(rng, long_per_km, n),
-    "Minutes": draw(rng, avg_minutes, n),
-    "Charge/minute": draw(rng, per_minute, n),
-    "Rider wage": draw(rng, wage, n),
-    "Motorcycle cost": draw(rng, motorcycle_cost, n),
-    "Backup battery": draw(rng, backup_battery, n),
-    "Maintenance": draw(rng, maintenance, n),
-    "Insurance": draw(rng, insurance, n),
-    "Energy kWh/km": draw(rng, kwh_km, n),
-    "Electricity rate": draw(rng, power_rate, n),
-    "Build budget": draw(rng, build_cost, n),
-    "Dev retainer": draw(rng, dev_retainer, n),
-    "Ops/admin": draw(rng, ops_fixed, n),
-    "Support/user": draw(rng, support_user, n),
-    "Marketing/user": draw(rng, marketing, n),
-}
-
-sim_fare = fare_from_inputs(
-    samples["Average km"],
-    samples["Minutes"],
-    samples["Base fare"],
-    included_km,
-    samples["Charge/km"],
-    long_km_threshold,
-    samples["Long charge/km"],
-    included_minutes,
-    samples["Charge/minute"],
-    eride_discount,
-)
-sim_demand = samples["Active users"] * samples["Rides/user/month"]
-sim_capacity = samples["Riders"] * samples["Rides/rider/day"] * samples["Operating days"]
-sim_completed = np.minimum(sim_demand, sim_capacity) * samples["Completion %"]
-sim_revenue = sim_completed * sim_fare * company_share + samples["Active users"] * user_fee
-sim_salary = samples["Riders"] * samples["Rider wage"] * samples["Operating days"] * (1 + burden)
-sim_gross_rider_day = (sim_completed * sim_fare) / np.maximum(samples["Riders"] * samples["Operating days"], 1)
-sim_incentive = (
-    samples["Riders"]
-    * samples["Operating days"]
-    * np.maximum(sim_gross_rider_day - incentive_threshold, 0)
-    * incentive_rate
-)
-sim_energy = sim_completed * samples["Average km"] * samples["Energy kWh/km"] * samples["Electricity rate"]
-sim_acquisition = (
-    samples["Riders"] * (samples["Motorcycle cost"] + samples["Backup battery"]) / asset_life
-    if include_fleet_capex
-    else np.zeros(n)
-)
-sim_fleet_ops = samples["Riders"] * (samples["Maintenance"] + samples["Insurance"])
-sim_development = samples["Build budget"] / build_recovery + samples["Dev retainer"]
-sim_technology = cloud_cost_from_workbook(samples["Active users"])
-sim_operations = samples["Ops/admin"] + samples["Active users"] * (samples["Support/user"] + samples["Marketing/user"])
-sim_payment = sim_revenue * digital_share * payment_fee
-sim_reserve = sim_revenue * regulatory_reserve
-sim_total_cost = (
-    sim_salary
-    + sim_incentive
-    + sim_energy
-    + sim_acquisition
-    + sim_fleet_ops
-    + sim_development
-    + sim_technology
-    + sim_operations
-    + sim_payment
-    + sim_reserve
-)
-sim_profit = sim_revenue - sim_total_cost
-
-results = pd.DataFrame(
-    {
-        "Active users": samples["Active users"],
-        "Riders": samples["Riders"],
-        "Completed rides": sim_completed,
-        "Average fare": sim_fare,
-        "Revenue": sim_revenue,
-        "Rider payroll": sim_salary,
-        "Rider incentives": sim_incentive,
-        "Energy": sim_energy,
-        "Fleet acquisition": sim_acquisition,
-        "Fleet operations": sim_fleet_ops,
-        "Development": sim_development,
-        "Technology": sim_technology,
-        "Operations": sim_operations,
-        "Payment fees": sim_payment,
-        "Tax/reg reserve": sim_reserve,
-        "Total cost": sim_total_cost,
-        "Profit": sim_profit,
-    }
-)
-
-
 # ---------------------------------------------------------------------------
 # Presentation
 # ---------------------------------------------------------------------------
@@ -637,7 +538,7 @@ if company_share < 0.5:
         unsafe_allow_html=True,
     )
 
-tabs = st.tabs(["Client summary", "Cost breakdown", "Cloud tiers", "Simulation", "Assumptions"])
+tabs = st.tabs(["Client summary", "Cost breakdown", "Cloud tiers", "Assumptions"])
 
 
 with tabs[0]:
@@ -722,16 +623,10 @@ with tabs[0]:
     )
     st.dataframe(fare_rows.style.format({"PHP": "PHP {:,.2f}"}), width="stretch", hide_index=True)
 
-    st.markdown("### Do we still need the simulation?")
-    st.write(
-        "For the client presentation, no: the main story should be the deterministic operating model above. "
-        "Simulation is still useful as an appendix because it shows risk: what happens if users, rides/day, costs, or completion rate miss the plan. "
-        "So the dashboard keeps it in a separate tab, but the client-facing decision should start with break-even rides/day and cost per user."
-    )
-
-
 with tabs[1]:
     st.markdown("### Full monthly cost breakdown")
+    build_recovery_cost = build_cost.mean / build_recovery if include_dev_recovery else 0.0
+    dev_support_cost = dev_retainer.mean if include_dev_recovery else 0.0
     cost_rows = pd.DataFrame(
         {
             "Cost category": [
@@ -753,8 +648,8 @@ with tabs[1]:
                 scenario["energy"],
                 scenario["fleet_acquisition"],
                 scenario["fleet_ops"],
-                build_cost.mean / build_recovery,
-                dev_retainer.mean,
+                build_recovery_cost,
+                dev_support_cost,
                 scenario["technology"],
                 scenario["operations"],
                 scenario["payment"],
@@ -900,8 +795,9 @@ with tabs[2]:
             tooltip=[alt.Tooltip("Active users:Q", format=",.0f"), alt.Tooltip("Cloud cost:Q", format=",.0f")],
         )
     )
+    current_cloud_estimate = float(cloud_cost_from_workbook(scenario["users"]))
     current_cloud = (
-        alt.Chart(pd.DataFrame({"Active users": [scenario["users"]], "Cloud cost": [scenario["technology"]]}))
+        alt.Chart(pd.DataFrame({"Active users": [scenario["users"]], "Cloud cost": [current_cloud_estimate]}))
         .mark_point(color=theme["negative"], filled=True, size=120)
         .encode(x="Active users:Q", y="Cloud cost:Q", tooltip=["Active users", "Cloud cost"])
     )
@@ -918,104 +814,23 @@ with tabs[2]:
 
 
 with tabs[3]:
-    st.markdown("### Simulation settings")
-    st.write(
-        "Use this tab as the appendix for risk discussion. It is not the main client story; it shows how sensitive profit is when assumptions move."
-    )
-    sc1, sc2 = st.columns(2)
-    with sc1:
-        st.number_input("Random seed", min_value=0, value=42, step=1, key="simulation_seed")
-    with sc2:
-        st.select_slider("Simulation trials", [1000, 2500, 5000, 10000, 20000], value=5000, key="simulation_trials")
-
-    with st.expander("Uncertainty assumptions (standard deviations)"):
-        st.caption("These affect only the Simulation tab. The client summary uses the exact sidebar inputs.")
-        sd_columns = st.columns(3)
-        for index, control in enumerate(SIMULATION_SD_CONTROLS):
-            with sd_columns[index % 3]:
-                step = float(control["step"])
-                st.number_input(
-                    f'{control["label"]} stdev',
-                    min_value=0.0,
-                    value=float(control["default"]),
-                    step=step,
-                    key=control["key"],
-                    format="%.3f" if step < 0.01 else ("%.2f" if step < 1 else "%.0f"),
-                )
-
-    st.markdown("### Simulation results")
-    mc1, mc2, mc3, mc4 = st.columns(4)
-    mc1.metric("Probability of loss", pct(float((results["Profit"] < 0).mean())), "simulated months below PHP 0")
-    mc2.metric("Mean simulated profit", peso(float(results["Profit"].mean())), f"median {peso(float(results['Profit'].median()))}")
-    mc3.metric("P10 downside", peso(float(results["Profit"].quantile(0.10))), "90% of trials are higher")
-    mc4.metric("P90 upside", peso(float(results["Profit"].quantile(0.90))), "10% of trials are higher")
-
-    hist = (
-        alt.Chart(results)
-        .mark_bar(color=theme["accent"], opacity=0.88)
-        .encode(
-            x=alt.X("Profit:Q", bin=alt.Bin(maxbins=55), title="Monthly profit / loss (PHP)"),
-            y=alt.Y("count():Q", title="Trials"),
-            tooltip=[alt.Tooltip("count():Q", title="Trials")],
-        )
-        .properties(height=335)
-    )
-    zero = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color=theme["negative"], strokeWidth=2).encode(x="x:Q")
-    profit_chart = (
-        (hist + zero)
-        .properties(background=theme["surface"])
-        .configure_axis(labelColor=theme["text"], titleColor=theme["muted"], gridColor=theme["border"])
-        .configure_view(strokeOpacity=0)
-    )
-    st.altair_chart(profit_chart, width="stretch")
-
-    st.markdown("### What moves profit most?")
-    sensitivities = []
-    for name, arr in samples.items():
-        if np.std(arr) > 0:
-            corr = np.corrcoef(arr, sim_profit)[0, 1]
-            if np.isfinite(corr):
-                sensitivities.append((name, corr))
-    sens = pd.DataFrame(sensitivities, columns=["Variable", "Correlation"])
-    sens["Absolute impact"] = sens["Correlation"].abs()
-    sens = sens.nlargest(12, "Absolute impact").sort_values("Correlation")
-    sens_chart = (
-        alt.Chart(sens)
-        .mark_bar(cornerRadiusEnd=5)
-        .encode(
-            x=alt.X("Correlation:Q", scale=alt.Scale(domain=[-1, 1]), title="Correlation with monthly profit"),
-            y=alt.Y("Variable:N", sort=None, title=None),
-            color=alt.condition(alt.datum.Correlation >= 0, alt.value(theme["positive"]), alt.value(theme["negative"])),
-            tooltip=["Variable", alt.Tooltip("Correlation:Q", format=".2f")],
-        )
-        .properties(height=335, background=theme["surface"])
-        .configure_axis(labelColor=theme["text"], titleColor=theme["muted"], gridColor=theme["border"])
-        .configure_view(strokeOpacity=0)
-    )
-    st.altair_chart(sens_chart, width="stretch")
-
-    export = results.round(4).to_csv(index=False).encode("utf-8")
-    st.download_button("Download simulation trials (CSV)", export, "eride_simulation_trials.csv", "text/csv")
-
-
-with tabs[4]:
     st.markdown("### Editable planning assumptions")
     assumptions = pd.DataFrame(
         [
-            ["Active users", users.mean, users.sd, "Internal scale case", "Monthly transacting users"],
-            ["Rides / active user / month", rides_user.mean, rides_user.sd, "Planning assumption", "Not a verified public PH market average"],
-            ["Rides / rider / day", rides_rider.mean, rides_rider.sd, "Internal roadmap prior", "Capacity and utilization target"],
-            ["Calculated passenger fare", expected_fare, float(results["Average fare"].std()), "Editable fare engine", "Base + distance + time - electric discount"],
-            ["Rider daily wage", wage.mean, wage.sd, "NWPC NCR-26", "PHP 695/day NCR non-agriculture effective July 18, 2025"],
-            ["E-motorcycle", motorcycle_cost.mean, motorcycle_cost.sd, "User estimate", "Primary battery included; backup battery separate"],
-            ["Development build", build_cost.mean, build_cost.sd, "Client budget", "Default PHP 1M over six months"],
-            ["Cloud", scenario["technology"], float(results["Technology"].std()), "Dev workbook + POC guidance", "POC PHP 1,500; API usage grows with users"],
-            ["Fixed operations", ops_fixed.mean, ops_fixed.sd, "Planning assumption", "Support/admin/ops excluding rider payroll"],
+            ["Active users", users.mean, "Internal scale case", "Monthly transacting users"],
+            ["Rides / active user / month", rides_user.mean, "Planning assumption", "Not a verified public PH market average"],
+            ["Rides / rider / day", rides_rider.mean, "Internal roadmap prior", "Capacity and utilization target"],
+            ["Calculated passenger fare", expected_fare, "Editable fare engine", "Base + distance + time - electric discount"],
+            ["Rider daily wage", wage.mean, "NWPC NCR-26", "PHP 695/day NCR non-agriculture effective July 18, 2025"],
+            ["E-motorcycle", motorcycle_cost.mean, "User estimate", "Primary battery included; backup battery separate"],
+            ["Development build", build_cost.mean, "Client budget", "Default PHP 1M over six months"],
+            ["Cloud", current_cloud_estimate, "Dev workbook + POC guidance", "POC PHP 1,500; API usage grows with users"],
+            ["Fixed operations", ops_fixed.mean, "Planning assumption", "Support/admin/ops excluding rider payroll"],
         ],
-        columns=["Variable", "Mean", "Stdev", "Basis", "Interpretation"],
+        columns=["Variable", "Value", "Basis", "Interpretation"],
     )
     st.dataframe(
-        assumptions.style.format({"Mean": "{:,.2f}", "Stdev": "{:,.2f}"}),
+        assumptions.style.format({"Value": "{:,.2f}"}),
         width="stretch",
         hide_index=True,
     )
@@ -1055,6 +870,6 @@ The Dev Costing Foundation workbook supplies the cloud/API growth inputs. The de
 
 
 st.markdown(
-    '<p class="small-note">E-Ride client operating model - Philippine pesos - Simulation tab is optional sensitivity analysis.</p>',
+    '<p class="small-note">E-Ride client operating model - Philippine pesos - editable deterministic financial model.</p>',
     unsafe_allow_html=True,
 )
