@@ -1,0 +1,606 @@
+E-RIDE DEVELOPER STUDY FLOW
+Goal: Become productive enough to maintain and build this E-Ride project.
+
+Suggested pace: 8 to 12 weeks if studying part-time, faster if full-time.
+Main project stack to prepare for:
+- Python + Streamlit for the business dashboard
+- Excel formulas / financial modeling for backup costing sheets
+- Git + GitHub for version control and deployment
+- React Native for passenger and rider mobile apps
+- React + TypeScript for future admin/operator dashboard
+- Node.js / Express or NestJS for backend APIs
+- PostgreSQL or similar database for trips, users, riders, fleet, and payments
+- Google Maps Platform APIs for maps, places, geocoding, and routing
+- AWS basics for backend deployment, monitoring, storage, and cost control
+
+
+PHASE 1 - PROJECT ORIENTATION
+Target: 2 to 3 days
+
+What to understand:
+1. What E-Ride is trying to answer:
+   - How many rides/day are needed to operate profitably?
+   - How much revenue per user is needed?
+   - How do fleet, rider wages, dev cost, cloud/API cost, and operations affect profit?
+
+2. Current repo files:
+   - eride_simulation_dashboard.py
+     Main Streamlit dashboard.
+   - eride_operating_model.xlsx
+     Excel fallback model with formulas.
+   - requirements.txt
+     Python dependencies.
+   - E-Ride_Formal_Proposal.md
+     Business and technical proposal.
+
+3. Current dashboard sections:
+   - Client summary
+   - Cost breakdown
+   - Cloud tiers
+   - Assumptions
+
+Mini task:
+- Run the dashboard locally:
+  python -m streamlit run eride_simulation_dashboard.py
+
+Checkpoint:
+- You can explain why the model becomes profitable only when rider utilization is high enough.
+
+
+PHASE 2 - PYTHON BASICS FOR DASHBOARD WORK
+Target: 1 week
+
+Learn:
+1. Python variables, functions, lists, dictionaries
+2. if/else conditions
+3. basic math operations
+4. reading and understanding formulas in code
+5. pandas DataFrames
+6. numpy arrays
+
+Practice using this project:
+- Find the fare calculation function.
+- Find the cloud/API costing function.
+- Change a default value safely.
+- Add one new cost line to the dashboard and Excel notes.
+
+Mini task:
+- Add a "Charging station rent" monthly input to the model.
+- Show it in cost breakdown.
+- Test if monthly profit changes.
+
+Checkpoint:
+- You can trace a sidebar input until it appears in profit/loss.
+
+
+PHASE 3 - STREAMLIT DASHBOARD DEVELOPMENT
+Target: 1 week
+
+Learn:
+1. st.sidebar
+2. st.number_input
+3. st.checkbox
+4. st.button
+5. st.metric
+6. st.dataframe
+7. st.tabs
+8. st.download_button
+9. Streamlit session_state
+10. Streamlit Community Cloud deployment basics
+
+Practice using this project:
+- Understand the quick recovery switches:
+  - Recover fleet assets
+  - Recover development cost
+  - Recover cloud/API cost
+- Understand the scenario buttons:
+  - Reset to profitable scenario
+  - Show conservative stress case
+
+Mini task:
+- Add a "Pilot mode" button that turns off dev recovery and fleet recovery.
+
+Checkpoint:
+- You can add a new input, use it in the model, and show the result on the client page.
+
+
+PHASE 4 - FINANCIAL MODELING AND BUSINESS LOGIC
+Target: 1 week
+
+Learn:
+1. Revenue
+2. Fixed cost
+3. Variable cost
+4. Gross revenue per rider/day
+5. Wage cost per rider/day
+6. Break-even fare
+7. Break-even rides/day
+8. Cost per completed ride
+9. Revenue per active user
+10. Fleet utilization
+
+Important E-Ride formulas:
+- completed rides =
+  min(users x rides/user/month, riders x rides/rider/day x operating days) x completion rate
+
+- fare =
+  base fare + distance charge + time charge - electric discount
+
+- profit =
+  revenue - rider payroll - incentives - energy - fleet - development - cloud/API - operations - fees/reserves
+
+Mini task:
+- Build three operating cases:
+  1. Conservative
+  2. Profitable
+  3. Aggressive expansion
+
+Checkpoint:
+- You can explain why rider wage is not the only issue; utilization is the key driver.
+
+
+PHASE 5 - EXCEL BACKUP MODEL
+Target: 3 to 5 days
+
+Learn:
+1. Excel formulas
+2. linked sheets
+3. cell references
+4. cost breakdown tables
+5. simple charts
+6. how Python openpyxl creates Excel files
+
+Practice using this project:
+- Open eride_operating_model.xlsx.
+- Inspect these sheets:
+  - Inputs
+  - Scenario_Comparison
+  - Model
+  - Cost_Breakdown
+  - Cloud_Tiers
+  - Dev_Budget
+  - Notes
+
+Mini task:
+- Add one new cost input in Excel and match it in Streamlit.
+
+Checkpoint:
+- Dashboard and Excel give the same business answer.
+
+
+PHASE 6 - GIT AND GITHUB WORKFLOW
+Target: 3 days
+
+Learn:
+1. git status
+2. git diff
+3. git add
+4. git commit
+5. git push
+6. branches
+7. GitHub repo basics
+8. avoiding accidental commits of temporary files
+
+Important:
+- Do not commit Excel lock files like:
+  ~$client_discovery_questionnaire.xlsx
+  ~$eride_operating_model.xlsx
+
+Common workflow:
+1. Check changes:
+   git status -sb
+
+2. Review changed file:
+   git diff -- eride_simulation_dashboard.py
+
+3. Stage only intended files:
+   git add eride_simulation_dashboard.py eride_operating_model.xlsx
+
+4. Commit:
+   git commit -m "Describe the change"
+
+5. Push:
+   git push origin main
+
+Checkpoint:
+- You can update the dashboard and push it without uploading unrelated documents.
+
+
+PHASE 7 - MAPS, ROUTING, AND CLOUD/API COSTING
+Target: 1 week
+
+Learn:
+1. Google Maps Platform basics
+2. Places Autocomplete
+3. Place Details
+4. Geocoding
+5. Routes / Compute Routes
+6. API keys
+7. API restrictions
+8. quotas and budgets
+9. usage monitoring
+10. how API pricing tiers work
+
+Why this matters:
+- The E-Ride cloud/API model is mostly Google Maps/Places/Routes usage plus a POC cloud baseline.
+- It is not yet a full AWS production architecture estimate.
+
+Mini task:
+- Create a small spreadsheet that estimates API cost from:
+  - active users
+  - searches/user/day
+  - route calls/user/day
+  - operating days/month
+
+Checkpoint:
+- You can explain why cloud/API cost grows with users.
+
+
+PHASE 8 - BACKEND DEVELOPMENT
+Target: 2 to 3 weeks
+
+Recommended stack:
+- Node.js
+- Express or NestJS
+- PostgreSQL
+- Prisma or TypeORM
+- JWT authentication
+- REST APIs
+- WebSocket basics for realtime ride status
+
+Core backend concepts:
+1. Users
+2. Riders/drivers
+3. Vehicles
+4. Trips
+5. Fare estimates
+6. Trip status:
+   - requested
+   - accepted
+   - rider_arriving
+   - in_progress
+   - completed
+   - cancelled
+7. Driver availability
+8. Location updates
+9. Earnings
+10. Admin reports
+
+Mini backend project:
+- Build APIs:
+  POST /users
+  POST /drivers
+  POST /trips
+  PATCH /trips/:id/status
+  GET /drivers/:id/earnings
+  GET /admin/trips
+
+Checkpoint:
+- You can create a fake trip from request to completion using API calls.
+
+
+PHASE 9 - DATABASE DESIGN
+Target: 1 week
+
+Learn:
+1. tables
+2. primary keys
+3. foreign keys
+4. indexes
+5. migrations
+6. seed data
+7. basic SQL queries
+
+Suggested E-Ride tables:
+- users
+- riders
+- vehicles
+- trips
+- fare_estimates
+- payments
+- rider_earnings
+- locations
+- support_tickets
+- audit_logs
+
+Mini task:
+- Design the trips table with:
+  - pickup coordinates
+  - dropoff coordinates
+  - distance
+  - fare
+  - status
+  - user_id
+  - rider_id
+
+Checkpoint:
+- You can explain what data is needed to calculate revenue, wage coverage, and utilization.
+
+
+PHASE 10 - REACT NATIVE MOBILE APP BASICS
+Target: 2 to 3 weeks
+
+Learn:
+1. React components
+2. props and state
+3. hooks
+4. navigation
+5. forms
+6. API calls
+7. maps
+8. location permissions
+9. push notifications concept
+10. mobile UI patterns
+
+Passenger app screens:
+- login/signup
+- home map
+- pickup/dropoff search
+- fare estimate
+- booking confirmation
+- rider assigned
+- active trip
+- trip complete
+- ride history
+- profile
+- emergency/trusted contact
+
+Rider app screens:
+- login
+- online/offline toggle
+- incoming request
+- accept/decline
+- navigation view
+- start trip
+- complete trip
+- earnings
+- activity history
+
+Mini task:
+- Build static passenger and rider screens first.
+- Then connect one screen to a mock backend API.
+
+Checkpoint:
+- You can explain the passenger and rider ride flow end to end.
+
+
+PHASE 11 - ADMIN / OPERATOR DASHBOARD
+Target: 1 to 2 weeks
+
+Recommended stack:
+- React
+- TypeScript
+- Tailwind or component library
+- API integration
+- charts
+
+Admin dashboard modules:
+1. Active trips
+2. Rider list
+3. Vehicle list
+4. User list
+5. Daily revenue
+6. Completed rides
+7. Cancellations
+8. Rider utilization
+9. Fleet status
+10. Support issues
+
+Mini task:
+- Build a simple admin page that shows:
+  - completed rides today
+  - active riders
+  - revenue
+  - cancellations
+
+Checkpoint:
+- You can build a basic operator dashboard from backend data.
+
+
+PHASE 12 - AWS AND DEPLOYMENT BASICS
+Target: 1 to 2 weeks
+
+Learn:
+1. AWS account safety
+2. IAM users and roles
+3. billing alerts
+4. budgets
+5. S3
+6. CloudWatch logs
+7. ECS/Fargate or simple app hosting
+8. RDS basics
+9. environment variables
+10. backups
+
+Mini task:
+- Deploy a tiny backend API.
+- Add CloudWatch logs.
+- Add a monthly budget alert.
+
+Checkpoint:
+- You can explain what costs are AWS infrastructure versus Google Maps API usage.
+
+
+PHASE 13 - SECURITY, PRIVACY, AND COMPLIANCE
+Target: 1 week
+
+Learn:
+1. password hashing
+2. JWT/session security
+3. role-based access
+4. data privacy basics
+5. audit logs
+6. API rate limiting
+7. secure API keys
+8. protecting location data
+9. consent and user data retention
+10. incident response basics
+
+E-Ride sensitive data:
+- user identity
+- rider identity
+- location history
+- trip history
+- payment records
+- emergency contact data
+
+Mini task:
+- Write a simple data privacy checklist for the MVP.
+
+Checkpoint:
+- You know which data must not be exposed in client-side code or public repos.
+
+
+PHASE 14 - TESTING AND QUALITY
+Target: 1 week
+
+Learn:
+1. manual testing
+2. unit tests
+3. API tests
+4. UI tests
+5. regression testing
+6. test data
+7. bug reports
+
+For this dashboard:
+- Run:
+  python -m py_compile eride_simulation_dashboard.py
+
+- Test Streamlit:
+  python -m streamlit run eride_simulation_dashboard.py
+
+For backend:
+- Test APIs using Postman or Bruno.
+
+For mobile:
+- Test main flows on simulator and real device.
+
+Checkpoint:
+- You can make a change without breaking the dashboard or model formulas.
+
+
+PHASE 15 - YOUR FIRST REAL CONTRIBUTIONS
+Target: After 4 to 8 weeks
+
+Start with:
+1. Fix dashboard wording
+2. Add new cost variables
+3. Improve Excel formulas
+4. Add scenario presets
+5. Add export/download features
+6. Improve charts
+7. Write documentation
+
+Then move to:
+1. Backend trip API
+2. Fare estimate API
+3. Basic database schema
+4. Driver earnings calculation
+5. Admin dashboard MVP
+6. Mobile app API integration
+
+Good first tickets:
+- Add depot rent to operating costs.
+- Add battery replacement reserve.
+- Add SMS OTP cost estimate.
+- Add production AWS baseline separate from Google Maps API.
+- Add "Pilot Mode" preset.
+- Add "Expansion Mode" preset.
+- Add readme instructions for running the dashboard.
+
+
+WEEKLY STUDY SCHEDULE
+
+Week 1:
+- Python basics
+- Run Streamlit dashboard
+- Understand profit model
+
+Week 2:
+- Streamlit inputs, metrics, tables, charts
+- Modify one dashboard variable
+- Learn Git basics
+
+Week 3:
+- Excel formulas and backup model
+- Match one dashboard formula in Excel
+- Push a small change to GitHub
+
+Week 4:
+- Business logic and costing
+- Cloud/API pricing model
+- Add one new cost category
+
+Week 5:
+- Backend API basics with Node.js
+- Build mock users, riders, trips APIs
+
+Week 6:
+- Database basics
+- Design E-Ride schema
+- Connect API to database
+
+Week 7:
+- React Native basics
+- Build static passenger/rider screens
+
+Week 8:
+- Connect mobile screens to mock API
+- Build basic admin dashboard
+
+Week 9:
+- AWS basics
+- Deploy backend test API
+- Add budget alerts
+
+Week 10:
+- Security/privacy basics
+- Testing and documentation
+- Prepare demo-ready project flow
+
+
+DAILY STUDY ROUTINE
+
+1. 20 minutes reading
+2. 60 minutes coding
+3. 20 minutes debugging
+4. 15 minutes notes
+5. 5 minutes Git commit review
+
+Ask yourself every day:
+- What part of E-Ride did I understand better today?
+- What input affects profit the most?
+- What code path did I trace?
+- What can I explain to a client or teammate now?
+
+
+MINIMUM SKILL CHECKLIST
+
+You are ready to contribute meaningfully when you can:
+
+[ ] Run the dashboard locally
+[ ] Change a Streamlit input safely
+[ ] Explain the profit formula
+[ ] Explain rider wage vs utilization
+[ ] Explain cloud/API cost tiers
+[ ] Update the Excel fallback model
+[ ] Use git status, diff, add, commit, push
+[ ] Read a backend API route
+[ ] Design a simple trips table
+[ ] Build a simple React Native screen
+[ ] Explain passenger and rider trip flow
+[ ] Keep API keys and secrets out of GitHub
+
+
+FINAL TARGET
+
+You do not need to know everything before helping.
+
+Your first developer role in this project should be:
+Dashboard and business-model developer first,
+then backend/API contributor,
+then mobile/admin dashboard contributor,
+then cloud/deployment support.
+
+That path matches the current E-Ride project best because the operating model is already the main decision tool, and it teaches the business logic needed before building the production ride-hailing system.
