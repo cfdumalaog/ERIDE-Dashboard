@@ -174,10 +174,16 @@ st.markdown(
     }}
     [data-testid="stMetric"] {{
         background:var(--surface); padding:1rem 1.05rem; border:1px solid var(--border);
-        border-radius:14px; box-shadow:0 6px 18px #00000008;
+        border-radius:14px; box-shadow:0 6px 18px #00000008; overflow:visible;
     }}
     [data-testid="stMetricLabel"] p {{ color:var(--muted) !important; }}
-    [data-testid="stMetricValue"] {{ color:var(--text); letter-spacing:-.035em; }}
+    [data-testid="stMetricValue"] {{
+        color:var(--text); letter-spacing:-.035em; font-size:clamp(1.35rem,2.2vw,2rem) !important;
+        line-height:1.12 !important; white-space:normal !important; overflow-wrap:anywhere !important;
+    }}
+    [data-testid="stMetricValue"] div {{
+        white-space:normal !important; overflow-wrap:anywhere !important; text-overflow:clip !important;
+    }}
     [data-testid="stMetricDelta"] {{ color:var(--muted); }}
     .callout {{
         color:var(--text); background:var(--positive-soft); border:1px solid var(--positive);
@@ -246,10 +252,10 @@ with q3:
     )
 
 st.markdown("### Scenario shortcut")
-st.caption("Use this if you want the dashboard to jump from the conservative base case to a utilization case that covers rider wages and produces monthly profit.")
+st.caption("The dashboard now opens on the profitable utilization case. Use these buttons to reset or stress-test the model.")
 sc1, sc2 = st.columns([1, 1])
 with sc1:
-    if st.button("Apply profitable utilization scenario", type="primary"):
+    if st.button("Reset to profitable scenario", type="primary"):
         st.session_state["users_m"] = 6000.0
         st.session_state["riders_m"] = 50.0
         st.session_state["rpu_m"] = 8.0
@@ -257,7 +263,7 @@ with sc1:
         st.session_state["days_m"] = 26.0
         st.session_state["completion_m"] = 90.0
 with sc2:
-    if st.button("Reset conservative base case"):
+    if st.button("Show conservative stress case"):
         st.session_state["users_m"] = 3750.0
         st.session_state["riders_m"] = 50.0
         st.session_state["rpu_m"] = 4.0
@@ -365,10 +371,10 @@ with st.sidebar:
     st.caption("Client-ready inputs. Type directly in any number field; the +/- buttons are optional.")
 
     with st.expander("Demand and fleet", expanded=True):
-        users = mean_sd("Active users", 3750, 600, 100, 1, "Monthly transacting users.", "users")
+        users = mean_sd("Active users", 6000, 600, 100, 1, "Monthly transacting users.", "users")
         riders = mean_sd("Number of riders / vehicles", 50, 3, 1, 1, "One salaried rider per active vehicle.", "riders")
-        rides_user = mean_sd("Rides per user / month", 4, 1, 1, 1, "Actual ride count per active user per month.", "rpu")
-        rides_rider = mean_sd("Rides per rider / day", 10.0, 2.0, 0.5, 0.1, "Capacity target per rider/vehicle.", "rpd")
+        rides_user = mean_sd("Rides per user / month", 8, 1, 1, 1, "Actual ride count per active user per month.", "rpu")
+        rides_rider = mean_sd("Rides per rider / day", 20.0, 2.0, 0.5, 0.1, "Capacity target per rider/vehicle.", "rpd")
         days = mean_sd("Operating days / month", 26, 1, 1, 1, "Typical operating days in the month.", "days")
         completion = mean_sd("Completion rate (%)", 90, 4, 1, 1, "Completed rides after requests/cancellations.", "completion")
         avg_km = mean_sd("Average paid trip distance (km)", 6.0, 1.5, 0.5, 0.5, "Distance used by fare and energy calculations.", "km")
@@ -590,9 +596,10 @@ tabs = st.tabs(["Client summary", "Cost breakdown", "Cloud tiers", "Assumptions"
 
 with tabs[0]:
     st.markdown("### Executive answer")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2 = st.columns(2)
     c1.metric("Monthly profit / loss", peso(scenario["profit"]), f"{peso(scenario['profit_user'], 2)} / user")
     c2.metric("Required revenue / user", peso(scenario["cost_user"], 2), f"current {peso(scenario['revenue_user'], 2)}")
+    c3, c4 = st.columns(2)
     c3.metric("Break-even fare", peso(break_even_fare, 2), f"current fare {peso(scenario['fare'], 2)}")
     c4.metric("Needed completed rides/day", f"{break_even_completed_rides / max(days.mean, 1):,.0f}" if np.isfinite(break_even_completed_rides) else "N/A", "at current fare")
 
