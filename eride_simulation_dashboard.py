@@ -244,6 +244,26 @@ with q3:
         key="include_cloud_cost",
     )
 
+st.markdown("### Scenario shortcut")
+st.caption("Use this if you want the dashboard to jump from the conservative base case to a utilization case that covers rider wages and produces monthly profit.")
+sc1, sc2 = st.columns([1, 1])
+with sc1:
+    if st.button("Apply profitable utilization scenario", type="primary"):
+        st.session_state["users_m"] = 6000.0
+        st.session_state["riders_m"] = 50.0
+        st.session_state["rpu_m"] = 8.0
+        st.session_state["rpd_m"] = 20.0
+        st.session_state["days_m"] = 26.0
+        st.session_state["completion_m"] = 90.0
+with sc2:
+    if st.button("Reset conservative base case"):
+        st.session_state["users_m"] = 3750.0
+        st.session_state["riders_m"] = 50.0
+        st.session_state["rpu_m"] = 4.0
+        st.session_state["rpd_m"] = 10.0
+        st.session_state["days_m"] = 26.0
+        st.session_state["completion_m"] = 90.0
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -404,13 +424,22 @@ expected_fare = fare_from_inputs(
 )
 
 
-def deterministic_model(fare: float, completed_override: float | None = None):
-    users_ = users.mean
-    riders_ = riders.mean
+def deterministic_model(
+    fare: float,
+    completed_override: float | None = None,
+    users_override: float | None = None,
+    riders_override: float | None = None,
+    rides_user_override: float | None = None,
+    rides_rider_override: float | None = None,
+):
+    users_ = users.mean if users_override is None else users_override
+    riders_ = riders.mean if riders_override is None else riders_override
+    rides_user_ = rides_user.mean if rides_user_override is None else rides_user_override
+    rides_rider_ = rides_rider.mean if rides_rider_override is None else rides_rider_override
     days_ = days.mean
     completion_ = completion.mean / 100
-    requested_demand = users_ * rides_user.mean
-    requested_capacity = riders_ * rides_rider.mean * days_
+    requested_demand = users_ * rides_user_
+    requested_capacity = riders_ * rides_rider_ * days_
     requested_served = min(requested_demand, requested_capacity)
     completed = requested_served * completion_ if completed_override is None else completed_override
 
@@ -511,6 +540,13 @@ else:
     break_even_completed_rides = math.nan
 
 scenario = deterministic_model(expected_fare)
+profitable_case = deterministic_model(
+    expected_fare,
+    users_override=6000.0,
+    riders_override=50.0,
+    rides_user_override=8.0,
+    rides_rider_override=20.0,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -593,6 +629,58 @@ with tabs[0]:
         st.success(
             f"Demand-constrained: the fleet can still absorb about {spare:,.0f} requested rides/month before vehicle capacity becomes the bottleneck."
         )
+
+    st.markdown("### Scenario that covers rider wages")
+    wage_per_rider_day = wage.mean * (1 + burden)
+    scenario_rows = pd.DataFrame(
+        [
+            {
+                "Scenario": "Current setup",
+                "Active users": scenario["users"],
+                "Riders": scenario["riders"],
+                "Rides / user / month": rides_user.mean,
+                "Requested rides / rider / day": rides_rider.mean,
+                "Completed rides / rider / day": scenario["completed_per_rider_day"],
+                "Fare revenue / rider / day": scenario["gross_per_rider_day"],
+                "Wage cost / rider / day": wage_per_rider_day,
+                "Wage coverage": scenario["gross_per_rider_day"] / max(wage_per_rider_day, 1),
+                "Monthly profit / loss": scenario["profit"],
+            },
+            {
+                "Scenario": "Profitable utilization case",
+                "Active users": profitable_case["users"],
+                "Riders": profitable_case["riders"],
+                "Rides / user / month": 8.0,
+                "Requested rides / rider / day": 20.0,
+                "Completed rides / rider / day": profitable_case["completed_per_rider_day"],
+                "Fare revenue / rider / day": profitable_case["gross_per_rider_day"],
+                "Wage cost / rider / day": wage_per_rider_day,
+                "Wage coverage": profitable_case["gross_per_rider_day"] / max(wage_per_rider_day, 1),
+                "Monthly profit / loss": profitable_case["profit"],
+            },
+        ]
+    )
+    st.dataframe(
+        scenario_rows.style.format(
+            {
+                "Active users": "{:,.0f}",
+                "Riders": "{:,.0f}",
+                "Rides / user / month": "{:,.1f}",
+                "Requested rides / rider / day": "{:,.1f}",
+                "Completed rides / rider / day": "{:,.1f}",
+                "Fare revenue / rider / day": "PHP {:,.2f}",
+                "Wage cost / rider / day": "PHP {:,.2f}",
+                "Wage coverage": "{:.1f}x",
+                "Monthly profit / loss": "PHP {:,.0f}",
+            }
+        ),
+        width="stretch",
+        hide_index=True,
+    )
+    st.info(
+        "Interpretation: the current setup barely covers wage per rider-day before other costs. "
+        "The profitable utilization case targets about 18 completed rides per rider per day, so fare revenue per rider-day is more than 2x the wage cost and the model turns profitable even with fleet, development, and cloud recovery switched on."
+    )
 
     st.markdown("### Fare design")
     st.caption(
