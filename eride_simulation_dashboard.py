@@ -698,6 +698,33 @@ with tabs[0]:
         "Presentation note: this table separates operating revenue, rider/fleet costs, development recovery, and the AWS deployment estimate so the client can see exactly where monthly profit is created or lost."
     )
 
+    st.markdown("### Cost per active user summary")
+    cost_per_user_rows = pd.DataFrame(
+        [
+            ["Rider payroll + incentives", payroll_total / max(scenario["users"], 1), "Main labor cost assigned across active users."],
+            ["Fleet assets + operations", fleet_total / max(scenario["users"], 1), "Motorcycle/battery recovery if enabled, plus maintenance, insurance, registration, and electricity."],
+            ["Development recovery + support", dev_total / max(scenario["users"], 1), "Monthly share of build cost and ongoing developer support."],
+            ["AWS / cloud deployment", platform_total / max(scenario["users"], 1), "AWS/platform cost allocated across active users."],
+            ["Operations, support and admin", ops_total / max(scenario["users"], 1), "Admin, support, dispatch, retention, and other operating overhead."],
+            ["Payment fees + reserves", transaction_total / max(scenario["users"], 1), "Digital payment fees and tax/regulatory reserve."],
+            ["Total cost per active user", scenario["cost_user"], "Minimum monthly revenue needed per active user to cover selected costs."],
+            ["Current revenue per active user", scenario["revenue_user"], "What the company currently earns per active user from fares and user fees."],
+            ["Profit / loss per active user", scenario["profit_user"], "Surplus or shortage per active user after all selected costs."],
+        ],
+        columns=["Cost / revenue line", "PHP per active user", "Simple explanation"],
+    )
+    cost_per_user_rows["PHP per active user"] = cost_per_user_rows["PHP per active user"].map(lambda value: peso(value, 2))
+    st.dataframe(cost_per_user_rows, width="stretch", hide_index=True)
+    if scenario["profit_user"] >= 0:
+        st.success(
+            f"Per-user answer: each active user generates about {peso(scenario['profit_user'], 2)} surplus after covering the modeled monthly cost base."
+        )
+    else:
+        st.error(
+            f"Per-user answer: each active user is short by about {peso(abs(scenario['profit_user']), 2)}. "
+            f"E-Ride needs revenue per user to reach at least {peso(scenario['cost_user'], 2)}."
+        )
+
     st.markdown("### Operating capacity")
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("Active users", f"{scenario['users']:,.0f}", f"{rides_user.mean:.0f} rides/user/month")
