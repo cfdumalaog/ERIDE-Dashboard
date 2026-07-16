@@ -616,6 +616,33 @@ with tabs[0]:
     c3.metric("Break-even fare", peso(break_even_fare, 2), f"current fare {peso(scenario['fare'], 2)}")
     c4.metric("Needed completed rides/day", f"{break_even_completed_rides / max(days.mean, 1):,.0f}" if np.isfinite(break_even_completed_rides) else "N/A", "at current fare")
 
+    st.markdown("#### Simple explanation of the executive figures")
+    explanation_rows = pd.DataFrame(
+        [
+            {
+                "Figure": "Monthly profit / loss",
+                "Plain meaning": "Money left after all modeled monthly revenue minus all selected monthly costs.",
+                "How to read it": "Positive means the business can operate with surplus. Negative means the business needs more rides, higher revenue, lower costs, or delayed cost recovery.",
+            },
+            {
+                "Figure": "Required revenue / user",
+                "Plain meaning": "How much the company must earn from each active user per month to cover selected costs.",
+                "How to read it": "Compare this against current revenue per user. If current is lower, the model is short per customer.",
+            },
+            {
+                "Figure": "Break-even fare",
+                "Plain meaning": "The average passenger fare needed per completed ride so monthly profit becomes exactly zero.",
+                "How to read it": "It is not the recommended fare. It is the minimum average fare needed to avoid losing money at the current users, riders, rides, and cost settings.",
+            },
+            {
+                "Figure": "Needed completed rides/day",
+                "Plain meaning": "The number of finished rides per day needed to cover costs using the current fare.",
+                "How to read it": "If this is higher than fleet capacity, E-Ride needs more riders/vehicles, better utilization, more operating days, or more revenue per ride/user.",
+            },
+        ]
+    )
+    st.dataframe(explanation_rows, width="stretch", hide_index=True)
+
     if scenario["profit"] >= 0:
         st.markdown(
             f'<div class="callout"><b>Client message:</b> At this setup, E-Ride can operate with an expected monthly profit of <b>{peso(scenario["profit"])}</b>. The model requires {peso(scenario["cost_user"], 2)} revenue per active user and currently earns {peso(scenario["revenue_user"], 2)}.</div>',
@@ -640,20 +667,20 @@ with tabs[0]:
     margin = scenario["profit"] / scenario["revenue"] if scenario["revenue"] else 0.0
     summary_raw = pd.DataFrame(
         [
-            ["Revenue", "Retained fare revenue", fare_revenue, fare_revenue / max(scenario["users"], 1), fare_revenue / max(scenario["trips"], 1)],
-            ["Revenue", "Membership / user fees", membership_revenue, membership_revenue / max(scenario["users"], 1), membership_revenue / max(scenario["trips"], 1)],
-            ["Revenue", "Total monthly revenue", scenario["revenue"], scenario["revenue_user"], scenario["revenue"] / max(scenario["trips"], 1)],
-            ["Cost", "Rider payroll + incentives", payroll_total, payroll_total / max(scenario["users"], 1), payroll_total / max(scenario["trips"], 1)],
-            ["Cost", "Fleet assets + fleet operations", fleet_total, fleet_total / max(scenario["users"], 1), fleet_total / max(scenario["trips"], 1)],
-            ["Cost", "Development recovery + support", dev_total, dev_total / max(scenario["users"], 1), dev_total / max(scenario["trips"], 1)],
-            ["Cost", "AWS / cloud deployment", platform_total, platform_total / max(scenario["users"], 1), platform_total / max(scenario["trips"], 1)],
-            ["Cost", "Operations, support and admin", ops_total, ops_total / max(scenario["users"], 1), ops_total / max(scenario["trips"], 1)],
-            ["Cost", "Payment fees + tax/regulatory reserve", transaction_total, transaction_total / max(scenario["users"], 1), transaction_total / max(scenario["trips"], 1)],
-            ["Cost", "Total monthly cost", scenario["total_cost"], scenario["cost_user"], scenario["cost_ride"]],
-            ["Result", "Net monthly profit / loss", scenario["profit"], scenario["profit_user"], scenario["profit_ride"]],
-            ["Result", "Profit margin", margin, margin, margin],
+            ["Revenue", "Retained fare revenue", "Company share of completed ride fares after the E-Ride discount.", fare_revenue, fare_revenue / max(scenario["users"], 1), fare_revenue / max(scenario["trips"], 1)],
+            ["Revenue", "Membership / user fees", "Optional monthly fee charged to active users, if enabled.", membership_revenue, membership_revenue / max(scenario["users"], 1), membership_revenue / max(scenario["trips"], 1)],
+            ["Revenue", "Total monthly revenue", "All money the company earns from fares and user fees before costs.", scenario["revenue"], scenario["revenue_user"], scenario["revenue"] / max(scenario["trips"], 1)],
+            ["Cost", "Rider payroll + incentives", "Base rider wages, employer burden, and commissions above the daily gross threshold.", payroll_total, payroll_total / max(scenario["users"], 1), payroll_total / max(scenario["trips"], 1)],
+            ["Cost", "Fleet assets + fleet operations", "Motorcycle/battery recovery if selected, plus maintenance, insurance, registration, and electricity.", fleet_total, fleet_total / max(scenario["users"], 1), fleet_total / max(scenario["trips"], 1)],
+            ["Cost", "Development recovery + support", "Monthly recovery of the PHP 1M build budget plus ongoing developer support.", dev_total, dev_total / max(scenario["users"], 1), dev_total / max(scenario["trips"], 1)],
+            ["Cost", "AWS / cloud deployment", "Monthly production cloud estimate based on the selected active user volume.", platform_total, platform_total / max(scenario["users"], 1), platform_total / max(scenario["trips"], 1)],
+            ["Cost", "Operations, support and admin", "Dispatch, customer support, admin, retention, and other non-rider operating costs.", ops_total, ops_total / max(scenario["users"], 1), ops_total / max(scenario["trips"], 1)],
+            ["Cost", "Payment fees + tax/regulatory reserve", "Digital payment processing fees and planning reserve for tax/regulatory obligations.", transaction_total, transaction_total / max(scenario["users"], 1), transaction_total / max(scenario["trips"], 1)],
+            ["Cost", "Total monthly cost", "All selected monthly costs that the business must cover.", scenario["total_cost"], scenario["cost_user"], scenario["cost_ride"]],
+            ["Result", "Net monthly profit / loss", "Total monthly revenue minus total monthly cost.", scenario["profit"], scenario["profit_user"], scenario["profit_ride"]],
+            ["Result", "Profit margin", "Profit as a percentage of revenue. Higher means more buffer for growth and unexpected costs.", margin, margin, margin],
         ],
-        columns=["Section", "Line item", "Monthly PHP", "PHP / active user", "PHP / completed ride"],
+        columns=["Section", "Line item", "Simple explanation", "Monthly PHP", "PHP / active user", "PHP / completed ride"],
     )
     summary_rows = summary_raw.copy()
     money_columns = ["Monthly PHP", "PHP / active user", "PHP / completed ride"]
