@@ -698,20 +698,47 @@ with tabs[0]:
         "Presentation note: this table separates operating revenue, rider/fleet costs, development recovery, and the AWS deployment estimate so the client can see exactly where monthly profit is created or lost."
     )
 
+    wage_per_rider_day = wage.mean * (1 + burden)
+    monthly_base_payroll = scenario["rider_salary"]
+    monthly_incentives = scenario["incentive"]
+    payroll_per_user = payroll_total / max(scenario["users"], 1)
+
+    st.markdown("### Rider wage and payroll basis")
+    wage_basis_rows = pd.DataFrame(
+        [
+            ["Daily base wage / rider", peso(wage.mean, 2), "Editable rider daily wage before employer burden."],
+            ["Employer burden / benefits", pct(burden), "Allowance for benefits and statutory employer overhead."],
+            ["Loaded wage / rider / day", peso(wage_per_rider_day, 2), "Daily wage after employer burden."],
+            ["Number of riders", f"{scenario['riders']:,.0f}", "One salaried rider per active vehicle in this model."],
+            ["Operating days / month", f"{days.mean:,.0f}", "Days paid/operated in the month."],
+            ["Monthly rider base payroll", peso(monthly_base_payroll), "Riders × loaded daily wage × operating days."],
+            ["Monthly rider incentives", peso(monthly_incentives), "Commission only when rider gross fare/day exceeds the incentive threshold."],
+            ["Payroll cost / active user", peso(payroll_per_user, 2), "Total rider payroll and incentives divided by active users."],
+        ],
+        columns=["Item", "Value", "What it means"],
+    )
+    st.dataframe(wage_basis_rows, width="stretch", hide_index=True)
+    st.info(
+        f"Why rider labor is {peso(payroll_per_user, 2)} per active user: "
+        f"{scenario['riders']:,.0f} riders × {peso(wage.mean, 2)} daily wage × {pct(1 + burden, 0)} loaded wage factor × "
+        f"{days.mean:,.0f} days, plus incentives, then divided by {scenario['users']:,.0f} active users. "
+        "This is not the rider's wage; it is the rider payroll allocated across the user base."
+    )
+
     st.markdown("### Cost per active user summary")
     cost_per_user_rows = pd.DataFrame(
         [
-            ["Rider payroll + incentives", payroll_total / max(scenario["users"], 1), "Main labor cost assigned across active users."],
-            ["Fleet assets + operations", fleet_total / max(scenario["users"], 1), "Motorcycle/battery recovery if enabled, plus maintenance, insurance, registration, and electricity."],
-            ["Development recovery + support", dev_total / max(scenario["users"], 1), "Monthly share of build cost and ongoing developer support."],
-            ["AWS / cloud deployment", platform_total / max(scenario["users"], 1), "AWS/platform cost allocated across active users."],
-            ["Operations, support and admin", ops_total / max(scenario["users"], 1), "Admin, support, dispatch, retention, and other operating overhead."],
-            ["Payment fees + reserves", transaction_total / max(scenario["users"], 1), "Digital payment fees and tax/regulatory reserve."],
-            ["Total cost per active user", scenario["cost_user"], "Minimum monthly revenue needed per active user to cover selected costs."],
-            ["Current revenue per active user", scenario["revenue_user"], "What the company currently earns per active user from fares and user fees."],
-            ["Profit / loss per active user", scenario["profit_user"], "Surplus or shortage per active user after all selected costs."],
+            ["Rider payroll + incentives", payroll_total / max(scenario["users"], 1), "Main labor cost assigned across active users.", "(rider wages + incentives) ÷ active users"],
+            ["Fleet assets + operations", fleet_total / max(scenario["users"], 1), "Motorcycle/battery recovery if enabled, plus maintenance, insurance, registration, and electricity.", "(fleet acquisition + fleet ops + electricity) ÷ active users"],
+            ["Development recovery + support", dev_total / max(scenario["users"], 1), "Monthly share of build cost and ongoing developer support.", "(build recovery + dev retainer) ÷ active users"],
+            ["AWS / cloud deployment", platform_total / max(scenario["users"], 1), "AWS/platform cost allocated across active users.", "AWS tier cost ÷ active users"],
+            ["Operations, support and admin", ops_total / max(scenario["users"], 1), "Admin, support, dispatch, retention, and other operating overhead.", "ops/admin/support/marketing ÷ active users"],
+            ["Payment fees + reserves", transaction_total / max(scenario["users"], 1), "Digital payment fees and tax/regulatory reserve.", "(payment fees + reserve) ÷ active users"],
+            ["Total cost per active user", scenario["cost_user"], "Minimum monthly revenue needed per active user to cover selected costs.", "total monthly cost ÷ active users"],
+            ["Current revenue per active user", scenario["revenue_user"], "What the company currently earns per active user from fares and user fees.", "monthly revenue ÷ active users"],
+            ["Profit / loss per active user", scenario["profit_user"], "Surplus or shortage per active user after all selected costs.", "profit/loss ÷ active users"],
         ],
-        columns=["Cost / revenue line", "PHP per active user", "Simple explanation"],
+        columns=["Cost / revenue line", "PHP per active user", "Simple explanation", "Formula / basis"],
     )
     cost_per_user_rows["PHP per active user"] = cost_per_user_rows["PHP per active user"].map(lambda value: peso(value, 2))
     st.dataframe(cost_per_user_rows, width="stretch", hide_index=True)
