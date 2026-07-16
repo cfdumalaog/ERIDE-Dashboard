@@ -245,9 +245,9 @@ with q2:
     )
 with q3:
     include_cloud_cost = st.checkbox(
-        "Recover cloud/API cost",
+        "Recover AWS/cloud cost",
         value=True,
-        help="Includes POC baseline plus Google Maps/Places/Routes API usage growth. Full AWS production architecture should be priced separately.",
+        help="Uses the production deployment cloud tiers supplied for client planning: 100 users=$200, 1K=$500, 10K=$1,000, 100K=$2,500 monthly.",
         key="include_cloud_cost",
     )
 
@@ -305,6 +305,12 @@ def pct(x: float, decimals: int = 1) -> str:
     return f"{100 * x:.{decimals}f}%"
 
 
+def usd(x: float, decimals: int = 0) -> str:
+    if not np.isfinite(x):
+        return "N/A"
+    return f"USD {x:,.{decimals}f}"
+
+
 def ninput(label, value, step=1.0, min_value=0.0, help=None, key=None, decimals=None):
     if decimals is None:
         decimals = 2 if abs(float(step)) < 1 else 0
@@ -335,43 +341,38 @@ def fare_from_inputs(distance_km, minutes, base, included_km_, per_km_, long_thr
     return np.maximum(before_discount * (1 - discount), 0)
 
 
-def cloud_cost_from_workbook(active_users):
-    """Cloud/API scaling based on workbook usage and official Google tier prices.
+PHP_PER_USD = 58.0
+AWS_TIER_USERS = np.array([0, 100, 1_000, 10_000, 100_000], dtype=float)
+AWS_TIER_USD = np.array([0, 200, 500, 1_000, 2_500], dtype=float)
 
-    The E-Ride Dev Costing Foundation workbook pilot sheet supplies:
-    - PHP 58/USD
-    - per-user/day API events inferred from 20-user pilot quantities:
-      5 autocomplete, 2 place-detail, 1 geocoding, 2 routes
 
-    Pricing uses Google Maps Platform's published tier ladder:
-    - Autocomplete Requests: 10k free, then 2.83 / 2.27 / 1.70 / 0.85 / 0.21 USD per 1k
-    - Place Details Essentials, Geocoding, Compute Routes Essentials:
-      10k free, then 5.00 / 4.00 / 3.00 / 1.50 / 0.38 USD per 1k
+def cloud_cost_usd(active_users):
+    """Production deployment cloud cost curve supplied for client planning.
 
-    The developer-confirmed POC baseline is PHP 1,500 because current POC usage
-    is expected to sit inside free tiers except for a small hosted-fallback budget.
+    Monthly AWS/cloud tiers:
+    - 100 users: USD 200
+    - 1,000 users: USD 500
+    - 10,000 users: USD 1,000
+    - 100,000 users: USD 2,500
+
+    Costs between tier points are linearly interpolated so any typed user count
+    produces a smooth estimate. Values above 100K continue at the last tier's
+    marginal slope for planning purposes.
     """
     users_ = np.asarray(active_users, dtype=float)
-    baseline_php = float(st.session_state.get("poc_cloud", 1500.0))
-    billing_days = float(st.session_state.get("days_m", 26.0))
-    php_per_usd = 58.0
-    usage_per_user_day = np.array([5.0, 2.0, 1.0, 2.0], dtype=float)
-    rates = np.array([
-        [0.0, 2.83, 2.27, 1.70, 0.85, 0.21],
-        [0.0, 5.00, 4.00, 3.00, 1.50, 0.38],
-        [0.0, 5.00, 4.00, 3.00, 1.50, 0.38],
-        [0.0, 5.00, 4.00, 3.00, 1.50, 0.38],
-    ])
-    bounds = np.array([0, 10_000, 100_000, 500_000, 1_000_000, 5_000_000, np.inf], dtype=float)
-    events = np.expand_dims(users_, axis=-1) * billing_days * usage_per_user_day
-    variable_usd = np.zeros_like(users_, dtype=float)
-    for api_index in range(events.shape[-1]):
-        api_events = events[..., api_index]
-        for tier_index, rate in enumerate(rates[api_index]):
-            billable = np.maximum(np.minimum(api_events, bounds[tier_index + 1]) - bounds[tier_index], 0.0)
-            variable_usd += billable / 1000.0 * rate
-    variable_php = variable_usd * php_per_usd
-    return baseline_php + variable_php
+    interpolated = np.interp(np.minimum(users_, AWS_TIER_USERS[-1]), AWS_TIER_USERS, AWS_TIER_USD)
+    overage_users = np.maximum(users_ - AWS_TIER_USERS[-1], 0)
+    last_marginal_usd_per_user = (AWS_TIER_USD[-1] - AWS_TIER_USD[-2]) / (AWS_TIER_USERS[-1] - AWS_TIER_USERS[-2])
+    return interpolated + overage_users * last_marginal_usd_per_user
+
+
+def cloud_cost_from_workbook(active_users):
+    """Return production AWS/cloud deployment cost in PHP.
+
+    Function name retained to avoid touching the rest of the financial model.
+    """
+    php_per_usd = float(st.session_state.get("php_usd", PHP_PER_USD))
+    return cloud_cost_usd(active_users) * php_per_usd
 
 
 # ---------------------------------------------------------------------------
@@ -424,7 +425,7 @@ with st.sidebar:
         build_cost = mean_sd("Development build budget", 1_000_000, 100_000, 50_000, 0, "Client-facing build budget spread over six months.", "build")
         build_recovery = ninput("Development recovery period (months)", 6, 1, 1, "Use 6 months to match the implementation work plan.", "build_life")
         dev_retainer = mean_sd("Ongoing dev support retainer", 55_000, 10_000, 5_000, 0, "Post-build support and iteration tier.", "dev")
-        poc_cloud_base = ninput("POC cloud baseline", 1500, 100, 0, "Developer-confirmed POC/free-tier baseline.", "poc_cloud")
+        php_usd = ninput("USD to PHP exchange rate", 58, 1, 1, "Used to convert the AWS deployment tiers to PHP.", "php_usd")
         ops_fixed = mean_sd("Operations, support and admin", 120_000, 25_000, 5_000, 0, "Dispatch/admin/customer support excluding rider payroll.", "ops")
         support_user = mean_sd("Support cost / active user", 2.0, 0.5, 0.1, 0, "Variable support allowance.", "support")
         marketing = mean_sd("Marketing / active user", 5.0, 2.0, 0.5, 0, "Retention and acquisition allowance.", "mkt")
@@ -627,6 +628,49 @@ with tabs[0]:
             unsafe_allow_html=True,
         )
 
+    st.markdown("### Board-ready financial summary")
+    fare_revenue = scenario["trips"] * scenario["fare"] * company_share
+    membership_revenue = scenario["users"] * user_fee
+    payroll_total = scenario["rider_salary"] + scenario["incentive"]
+    fleet_total = scenario["fleet_acquisition"] + scenario["fleet_ops"]
+    dev_total = scenario["development"]
+    platform_total = scenario["technology"]
+    ops_total = scenario["operations"]
+    transaction_total = scenario["payment"] + scenario["reserve"]
+    margin = scenario["profit"] / scenario["revenue"] if scenario["revenue"] else 0.0
+    summary_raw = pd.DataFrame(
+        [
+            ["Revenue", "Retained fare revenue", fare_revenue, fare_revenue / max(scenario["users"], 1), fare_revenue / max(scenario["trips"], 1)],
+            ["Revenue", "Membership / user fees", membership_revenue, membership_revenue / max(scenario["users"], 1), membership_revenue / max(scenario["trips"], 1)],
+            ["Revenue", "Total monthly revenue", scenario["revenue"], scenario["revenue_user"], scenario["revenue"] / max(scenario["trips"], 1)],
+            ["Cost", "Rider payroll + incentives", payroll_total, payroll_total / max(scenario["users"], 1), payroll_total / max(scenario["trips"], 1)],
+            ["Cost", "Fleet assets + fleet operations", fleet_total, fleet_total / max(scenario["users"], 1), fleet_total / max(scenario["trips"], 1)],
+            ["Cost", "Development recovery + support", dev_total, dev_total / max(scenario["users"], 1), dev_total / max(scenario["trips"], 1)],
+            ["Cost", "AWS / cloud deployment", platform_total, platform_total / max(scenario["users"], 1), platform_total / max(scenario["trips"], 1)],
+            ["Cost", "Operations, support and admin", ops_total, ops_total / max(scenario["users"], 1), ops_total / max(scenario["trips"], 1)],
+            ["Cost", "Payment fees + tax/regulatory reserve", transaction_total, transaction_total / max(scenario["users"], 1), transaction_total / max(scenario["trips"], 1)],
+            ["Cost", "Total monthly cost", scenario["total_cost"], scenario["cost_user"], scenario["cost_ride"]],
+            ["Result", "Net monthly profit / loss", scenario["profit"], scenario["profit_user"], scenario["profit_ride"]],
+            ["Result", "Profit margin", margin, margin, margin],
+        ],
+        columns=["Section", "Line item", "Monthly PHP", "PHP / active user", "PHP / completed ride"],
+    )
+    summary_rows = summary_raw.copy()
+    money_columns = ["Monthly PHP", "PHP / active user", "PHP / completed ride"]
+    for col in money_columns:
+        summary_rows[col] = [
+            pct(value, 1) if line == "Profit margin" else (peso(value, 0) if col == "Monthly PHP" else peso(value, 2))
+            for line, value in zip(summary_rows["Line item"], summary_raw[col])
+        ]
+    st.dataframe(
+        summary_rows,
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        "Presentation note: this table separates operating revenue, rider/fleet costs, development recovery, and the AWS deployment estimate so the client can see exactly where monthly profit is created or lost."
+    )
+
     st.markdown("### Operating capacity")
     s1, s2, s3, s4 = st.columns(4)
     s1.metric("Active users", f"{scenario['users']:,.0f}", f"{rides_user.mean:.0f} rides/user/month")
@@ -755,7 +799,7 @@ with tabs[1]:
                 "Fleet maintenance, insurance and registration",
                 "Development build recovery",
                 "Ongoing dev support retainer",
-                "Cloud and API usage",
+                "AWS / cloud deployment",
                 "Operations, support and admin",
                 "Payment processing",
                 "Tax / regulatory reserve",
@@ -864,61 +908,89 @@ with tabs[1]:
 
 
 with tabs[2]:
-    st.markdown("### Cloud/API cost tiers")
+    st.markdown("### AWS production deployment cost tiers")
     st.write(
-        "The current POC is expected to cost around PHP 1,500 because implemented features sit mostly inside free tiers. "
-        "As users grow, Google Maps/Places/Routes API calls are the main modeled cost driver. "
-        "AWS infrastructure is still represented only by the POC baseline unless a production server/database architecture is priced separately."
+        "For the actual deployment model, cloud cost now follows the AWS/platform volume assumptions supplied for client planning. "
+        "The values are entered in USD and converted to PHP using the exchange rate in the sidebar."
     )
-    tier_users = np.array([20, 100, 500, 1_000, 3_750, 5_000, 10_000, 25_000])
+    tier_users = np.array([100, 1_000, 10_000, 100_000])
     tier_names = [
-        "POC pilot",
-        "Small internal launch",
-        "Campus/barangay launch",
-        "Early city launch",
-        "Current scenario",
-        "Dense launch",
-        "City scale",
-        "Metro scale stress test",
+        "Pilot production launch",
+        "Early commercial launch",
+        "City-scale deployment",
+        "Metro-scale deployment",
     ]
+    php_per_usd_current = float(st.session_state.get("php_usd", PHP_PER_USD))
     cloud_tiers = pd.DataFrame(
         {
             "Tier": tier_names,
             "Active users": tier_users,
-            "Estimated monthly cloud/API cost": cloud_cost_from_workbook(tier_users),
+            "Monthly AWS cost (USD)": cloud_cost_usd(tier_users),
+            "Monthly AWS cost (PHP)": cloud_cost_from_workbook(tier_users),
         }
     )
-    cloud_tiers["Cost / active user"] = cloud_tiers["Estimated monthly cloud/API cost"] / cloud_tiers["Active users"]
+    cloud_tiers["PHP / active user"] = cloud_tiers["Monthly AWS cost (PHP)"] / cloud_tiers["Active users"]
     st.dataframe(
         cloud_tiers.style.format(
             {
                 "Active users": "{:,.0f}",
-                "Estimated monthly cloud/API cost": "PHP {:,.0f}",
-                "Cost / active user": "PHP {:,.2f}",
+                "Monthly AWS cost (USD)": "USD {:,.0f}",
+                "Monthly AWS cost (PHP)": "PHP {:,.0f}",
+                "PHP / active user": "PHP {:,.2f}",
             }
         ),
         width="stretch",
         hide_index=True,
     )
-    max_scale_users = max(25_000, int(scenario["users"] * 2))
-    scale_users = np.unique(
-        np.concatenate(([0, 20, 100, 500, 1000, int(scenario["users"])], np.linspace(0, max_scale_users, 180).astype(int)))
+    st.info(
+        f"Current scenario AWS/cloud estimate: {usd(float(cloud_cost_usd(scenario['users'])))} "
+        f"or {peso(float(cloud_cost_from_workbook(scenario['users'])))} per month at PHP {php_per_usd_current:,.0f}/USD."
     )
-    cloud_scale = pd.DataFrame({"Active users": scale_users, "Cloud cost": cloud_cost_from_workbook(scale_users)})
+    max_scale_users = max(100_000, int(scenario["users"] * 2))
+    scale_users = np.unique(
+        np.concatenate(([0, 100, 1000, 10_000, 100_000, int(scenario["users"])], np.linspace(0, max_scale_users, 220).astype(int)))
+    )
+    cloud_scale = pd.DataFrame(
+        {
+            "Active users": scale_users,
+            "Cloud cost PHP": cloud_cost_from_workbook(scale_users),
+            "Cloud cost USD": cloud_cost_usd(scale_users),
+        }
+    )
     cloud_line = (
         alt.Chart(cloud_scale)
         .mark_line(color=theme["accent"], strokeWidth=3)
         .encode(
             x=alt.X("Active users:Q", title="Active users"),
-            y=alt.Y("Cloud cost:Q", title="PHP per month"),
-            tooltip=[alt.Tooltip("Active users:Q", format=",.0f"), alt.Tooltip("Cloud cost:Q", format=",.0f")],
+            y=alt.Y("Cloud cost PHP:Q", title="PHP per month"),
+            tooltip=[
+                alt.Tooltip("Active users:Q", format=",.0f"),
+                alt.Tooltip("Cloud cost USD:Q", title="USD/month", format=",.0f"),
+                alt.Tooltip("Cloud cost PHP:Q", title="PHP/month", format=",.0f"),
+            ],
         )
     )
     current_cloud_estimate = float(cloud_cost_from_workbook(scenario["users"]))
     current_cloud = (
-        alt.Chart(pd.DataFrame({"Active users": [scenario["users"]], "Cloud cost": [current_cloud_estimate]}))
+        alt.Chart(
+            pd.DataFrame(
+                {
+                    "Active users": [scenario["users"]],
+                    "Cloud cost PHP": [current_cloud_estimate],
+                    "Cloud cost USD": [float(cloud_cost_usd(scenario["users"]))],
+                }
+            )
+        )
         .mark_point(color=theme["negative"], filled=True, size=120)
-        .encode(x="Active users:Q", y="Cloud cost:Q", tooltip=["Active users", "Cloud cost"])
+        .encode(
+            x="Active users:Q",
+            y="Cloud cost PHP:Q",
+            tooltip=[
+                alt.Tooltip("Active users:Q", format=",.0f"),
+                alt.Tooltip("Cloud cost USD:Q", title="USD/month", format=",.0f"),
+                alt.Tooltip("Cloud cost PHP:Q", title="PHP/month", format=",.0f"),
+            ],
+        )
     )
     cloud_chart = (
         (cloud_line + current_cloud)
@@ -928,11 +1000,7 @@ with tabs[2]:
     )
     st.altair_chart(cloud_chart, width="stretch")
     st.caption(
-        f"Basis: PHP 58/USD, {days.mean:g} operating days/month, workbook pilot usage ratios of 5 autocomplete, 2 place-detail, "
-        "1 geocoding and 2 route events per user/day, and official Google Maps Platform tiered pricing. "
-        "Autocomplete Requests use 10k free then 2.83/2.27/1.70/0.85/0.21 USD per 1k by volume; "
-        "Place Details Essentials, Geocoding, and Compute Routes Essentials use 10k free then 5/4/3/1.5/0.38 USD per 1k. "
-        "This is a Google API usage model plus a POC baseline, not a full AWS production architecture estimate."
+        "Basis: user-supplied AWS/platform volume assumptions. The curve interpolates between 100, 1K, 10K, and 100K users so manual user counts still produce a smooth monthly cloud estimate."
     )
 
 
@@ -947,7 +1015,7 @@ with tabs[3]:
             ["Rider daily wage", wage.mean, "NWPC NCR-26", "PHP 695/day NCR non-agriculture effective July 18, 2025"],
             ["E-motorcycle", motorcycle_cost.mean, "User estimate", "Primary battery included; backup battery separate"],
             ["Development build", build_cost.mean, "Client budget", "Default PHP 1M over six months"],
-            ["Cloud", current_cloud_estimate, "Dev workbook + POC guidance", "POC PHP 1,500; API usage grows with users"],
+            ["AWS / cloud", current_cloud_estimate, "User-supplied deployment tiers", "100 users=$200; 1K=$500; 10K=$1,000; 100K=$2,500 monthly"],
             ["Fixed operations", ops_fixed.mean, "Planning assumption", "Support/admin/ops excluding rider payroll"],
         ],
         columns=["Variable", "Value", "Basis", "Interpretation"],
@@ -973,8 +1041,8 @@ The Philippine motorcycle-taxi pilot benchmark used PHP 50 for the first 2 km, t
 The 2020 pilot registered 46,713 riders across participating operators. This supports supply scale only; it does not prove demand or user ride frequency for E-Ride.<br>
 <a href="https://www.pna.gov.ph/articles/1093673" target="_blank">Philippine News Agency - registered pilot riders</a></div>
 
-<div class="source-card"><b>Cloud - workbook and developer guidance</b><br>
-The Dev Costing Foundation workbook supplies the cloud/API growth inputs. The developer guidance says the current POC should be around PHP 1,500 because implemented features are mostly covered by free tiers.</div>
+<div class="source-card"><b>AWS / cloud deployment cost - planning assumption</b><br>
+Cloud cost uses the supplied production platform volume schedule: 100 users = USD 200/month, 1K users = USD 500/month, 10K users = USD 1,000/month, and 100K users = USD 2,500/month. The dashboard interpolates between these points for manual user counts.</div>
 """,
         unsafe_allow_html=True,
     )
